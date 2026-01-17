@@ -12,7 +12,7 @@ from telegram.ext import (
 
 from config import BOT_TOKEN, REQUIRED_CHANNELS, MESSAGES
 from database import init_db, add_user, add_to_playlist, get_playlist
-from downloader import is_valid_url, extract_url, download_video, download_audio, cleanup_file
+from downloader import is_valid_url, extract_url, download_video, download_audio, cleanup_file, get_video_info
 
 # Logging sozlash
 logging.basicConfig(
@@ -21,11 +21,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Foydalanuvchi so'nggi URL'ini saqlash
+# Foydalanuvchi ma'lumotlarini saqlash
 user_last_url = {}
+user_selected_quality = {}
 
 def get_channel_keyboard():
-    """Kanallar tugmalari - chiroyli dizayn"""
+    """Kanallar tugmalari"""
     keyboard = []
     for i, channel in enumerate(REQUIRED_CHANNELS, 1):
         channel_name = channel.replace('@', '')
@@ -36,8 +37,25 @@ def get_channel_keyboard():
     keyboard.append([InlineKeyboardButton("✅ Tekshirish", callback_data="check_sub")])
     return InlineKeyboardMarkup(keyboard)
 
+def get_quality_keyboard():
+    """Sifat tanlash tugmalari"""
+    keyboard = [
+        [
+            InlineKeyboardButton("📱 360p", callback_data="quality_360p"),
+            InlineKeyboardButton("📺 480p", callback_data="quality_480p"),
+        ],
+        [
+            InlineKeyboardButton("🖥 720p HD", callback_data="quality_720p"),
+            InlineKeyboardButton("🎬 1080p FHD", callback_data="quality_1080p"),
+        ],
+        [
+            InlineKeyboardButton("⭐ Eng yaxshi sifat", callback_data="quality_best"),
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 def get_video_keyboard():
-    """Video tugmalari - 3 ta tugma"""
+    """Video tugmalari"""
     keyboard = [
         [
             InlineKeyboardButton("📂 Saqlash", callback_data="save_playlist"),
@@ -117,7 +135,7 @@ async def playlist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"Playlist yuborishda xatolik: {e}")
 
 async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """URL qayta ishlash"""
+    """URL qayta ishlash - sifat tanlash"""
     user = update.effective_user
     text = update.message.text
     
@@ -133,47 +151,90 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # URL'ni saqlash
     user_last_url[user.id] = url
     
-    # Yuklab olish xabari
-    status_msg = await update.message.reply_text(
-        MESSAGES["downloading"],
+    # Sifat tanlash menyusi
+    quality_msg = """
+╔══════════════════════════════╗
+   🎬 <b>SIFATNI TANLANG</b>
+╚══════════════════════════════╝
+
+📹 Video uchun sifatni tanlang:
+
+▫️ <b>360p</b> - Kichik hajm (~5-15 MB)
+▫️ <b>480p</b> - O'rta sifat (~15-30 MB)
+▫️ <b>720p HD</b> - Yaxshi sifat (~30-60 MB)
+▫️ <b>1080p FHD</b> - Yuqori sifat (~60-150 MB)
+▫️ <b>Eng yaxshi</b> - Maksimal sifat
+
+⚠️ <i>Katta fayllar (50MB+) biroz sekin yuklanadi</i>
+"""
+    
+    await update.message.reply_text(
+        quality_msg,
+        parse_mode="HTML",
+        reply_markup=get_quality_keyboard()
+    )
+
+async def download_and_send(query, context, user_id: int, url: str, quality: str):
+    """Video yuklab yuborish"""
+    
+    status_msg = await query.message.reply_text(
+        f"⏳ <b>Yuklanmoqda... ({quality})</b>\n\nIltimos, kuting...",
         parse_mode="HTML"
     )
     
     try:
         # Video yuklab olish
-        result = await download_video(url, user.id)
+        result = await download_video(url, user_id, quality)
         
         if not result['success']:
-            await status_msg.edit_text(
-                MESSAGES["download_error"],
-                parse_mode="HTML"
-            )
+            error_text = f"""
+❌ <b>Xatolik!</b>
+
+{result.get('error', 'Video yuklab olinmadi')}
+
+💡 <b>Maslahat:</b>
+▫️ Boshqa sifatni tanlang
+▫️ Video mavjudligini tekshiring
+"""
+            await status_msg.edit_text(error_text, parse_mode="HTML")
             return
         
         file_path = result['file_path']
+        file_size_mb = result['file_size'] / (1024 * 1024)
         
-        # Fayl hajmini tekshirish
-        if result.get('is_large'):
+        # Fayl hajmi haqida xabar
+        if file_size_mb > 50:
             await status_msg.edit_text(
-                MESSAGES["file_too_large"],
+                f"📤 <b>Yuborilmoqda...</b>\n\nHajmi: {file_size_mb:.1f} MB\n⚠️ Katta fayl, biroz kuting...",
+                parse_mode="HTML"
+            )
+        else:
+            await status_msg.edit_text(
+                f"📤 <b>Yuborilmoqda...</b>\n\nHajmi: {file_size_mb:.1f} MB",
                 parse_mode="HTML"
             )
         
         # Caption
-        caption = MESSAGES["video_caption"].format(title=result['title'][:50])
+        caption = f"""
+🎬 <b>{result['title']}</b>
+
+📊 Sifat: {quality}
+📁 Hajmi: {file_size_mb:.1f} MB
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📥 @OLTIN_SAQLAYDI_BOT orqali yuklandi
+"""
         
         # Rasm yoki Video yuborish
         if result.get('is_photo'):
-            # Rasm yuborish
             with open(file_path, 'rb') as photo_file:
-                sent_message = await update.message.reply_photo(
+                sent_message = await query.message.reply_photo(
                     photo=photo_file,
                     caption=caption,
                     parse_mode="HTML",
                     reply_markup=get_video_keyboard()
                 )
             
-            # Photo ID saqlash
             context.user_data['last_video'] = {
                 'file_id': sent_message.photo[-1].file_id,
                 'title': result['title'],
@@ -181,33 +242,47 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'is_photo': True
             }
         else:
-            # Video yuborish
             with open(file_path, 'rb') as video_file:
-                sent_message = await update.message.reply_video(
+                sent_message = await query.message.reply_video(
                     video=video_file,
                     caption=caption,
                     parse_mode="HTML",
-                    reply_markup=get_video_keyboard()
+                    reply_markup=get_video_keyboard(),
+                    supports_streaming=True
                 )
             
-            # File ID saqlash
             context.user_data['last_video'] = {
                 'file_id': sent_message.video.file_id,
                 'title': result['title'],
                 'url': url,
                 'is_photo': False
             }
-
         
         await status_msg.delete()
         cleanup_file(file_path)
         
     except Exception as e:
         logger.error(f"Video yuborishda xatolik: {e}")
-        await status_msg.edit_text(
-            MESSAGES["download_error"],
-            parse_mode="HTML"
-        )
+        
+        # 50MB dan katta bo'lsa maxsus xabar
+        if "Request Entity Too Large" in str(e) or "file is too big" in str(e).lower():
+            await status_msg.edit_text(
+                f"""
+❌ <b>Fayl juda katta!</b>
+
+Telegram 50MB dan katta fayllarni qabul qilmaydi.
+
+💡 <b>Yechim:</b>
+Pastroq sifatni tanlang (360p yoki 480p)
+""",
+                parse_mode="HTML",
+                reply_markup=get_quality_keyboard()
+            )
+        else:
+            await status_msg.edit_text(
+                MESSAGES["download_error"],
+                parse_mode="HTML"
+            )
 
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Callback tugmalar"""
@@ -218,12 +293,26 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     
     if data == "check_sub":
-        # Tekshirmasdan o'tkazish
         await query.edit_message_text(
             MESSAGES["subscribed"],
             parse_mode="HTML",
             reply_markup=get_main_keyboard()
         )
+    
+    # Sifat tanlash
+    elif data.startswith("quality_"):
+        quality = data.replace("quality_", "")
+        url = user_last_url.get(user.id)
+        
+        if not url:
+            await query.answer("❌ URL topilmadi. Iltimos, qaytadan yuboring.", show_alert=True)
+            return
+        
+        # Sifatni saqlash
+        user_selected_quality[user.id] = quality
+        
+        # Yuklab yuborish
+        await download_and_send(query, context, user.id, url, quality)
     
     elif data == "save_playlist":
         last_video = context.user_data.get('last_video')
@@ -231,11 +320,11 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await add_to_playlist(
                 user_id=user.id,
                 file_id=last_video['file_id'],
-                file_type='video',
+                file_type='photo' if last_video.get('is_photo') else 'video',
                 title=last_video['title'],
                 url=last_video['url']
             )
-            await query.answer("✅ Video playlistga saqlandi!", show_alert=True)
+            await query.answer("✅ Playlistga saqlandi!", show_alert=True)
         else:
             await query.answer("❌ Video topilmadi", show_alert=True)
     
@@ -255,7 +344,12 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             result = await download_audio(url, user.id)
             
             if result['success']:
-                caption = MESSAGES["audio_caption"].format(title=result['title'][:50])
+                caption = f"""
+🎵 <b>{result['title']}</b>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📥 @OLTIN_SAQLAYDI_BOT orqali yuklandi
+"""
                 
                 with open(result['file_path'], 'rb') as audio_file:
                     sent_audio = await query.message.reply_audio(
@@ -274,7 +368,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 cleanup_file(result['file_path'])
             else:
                 await status_msg.edit_text(
-                    MESSAGES["download_error"],
+                    "❌ Musiqa yuklab olinmadi. FFmpeg o'rnatilmagan bo'lishi mumkin.",
                     parse_mode="HTML"
                 )
         except Exception as e:
@@ -303,6 +397,12 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         chat_id=user.id,
                         video=item['file_id'],
                         caption=f"📹 {item['title']}"
+                    )
+                elif item['file_type'] == 'photo':
+                    await context.bot.send_photo(
+                        chat_id=user.id,
+                        photo=item['file_id'],
+                        caption=f"📸 {item['title']}"
                     )
                 else:
                     await context.bot.send_audio(
