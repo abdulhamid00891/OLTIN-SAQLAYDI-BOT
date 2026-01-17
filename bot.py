@@ -159,24 +159,45 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="HTML"
             )
         
-        # Video caption
+        # Caption
         caption = MESSAGES["video_caption"].format(title=result['title'][:50])
         
-        # Video yuborish
-        with open(file_path, 'rb') as video_file:
-            sent_message = await update.message.reply_video(
-                video=video_file,
-                caption=caption,
-                parse_mode="HTML",
-                reply_markup=get_video_keyboard()
-            )
-        
-        # File ID saqlash
-        context.user_data['last_video'] = {
-            'file_id': sent_message.video.file_id,
-            'title': result['title'],
-            'url': url
-        }
+        # Rasm yoki Video yuborish
+        if result.get('is_photo'):
+            # Rasm yuborish
+            with open(file_path, 'rb') as photo_file:
+                sent_message = await update.message.reply_photo(
+                    photo=photo_file,
+                    caption=caption,
+                    parse_mode="HTML",
+                    reply_markup=get_video_keyboard()
+                )
+            
+            # Photo ID saqlash
+            context.user_data['last_video'] = {
+                'file_id': sent_message.photo[-1].file_id,
+                'title': result['title'],
+                'url': url,
+                'is_photo': True
+            }
+        else:
+            # Video yuborish
+            with open(file_path, 'rb') as video_file:
+                sent_message = await update.message.reply_video(
+                    video=video_file,
+                    caption=caption,
+                    parse_mode="HTML",
+                    reply_markup=get_video_keyboard()
+                )
+            
+            # File ID saqlash
+            context.user_data['last_video'] = {
+                'file_id': sent_message.video.file_id,
+                'title': result['title'],
+                'url': url,
+                'is_photo': False
+            }
+
         
         await status_msg.delete()
         cleanup_file(file_path)
