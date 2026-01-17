@@ -23,39 +23,144 @@ SUPPORTED_PLATFORMS = [
     "youtube.com", "youtu.be",
     "tiktok.com",
     "instagram.com",
-    "facebook.com", "fb.watch"
+    "facebook.com", "fb.watch",
+    "twitter.com", "x.com"
 ]
 
-# Xabarlar (O'zbek tilida)
+# Xabarlar (O'zbek tilida) - Mukammal dizayn
 MESSAGES = {
-    "welcome": "Assalomu alaykum, {name}! 👋\n\n🎬 Men video yuklab oluvchi botman.\n\nBotdan foydalanish uchun quyidagi kanallarga obuna bo'ling:",
-    "check_subscription": "✅ Obunani tekshirish",
-    "not_subscribed": "❌ Siz hali barcha kanallarga obuna bo'lmagansiz!\n\nIltimos, quyidagi kanallarga obuna bo'ling:",
-    "subscribed": "✅ Ajoyib! Siz barcha kanallarga obuna bo'lgansiz!\n\n🔗 Endi menga YouTube, TikTok, Instagram yoki Facebook video havolasini yuboring.",
+    "welcome": """
+╔══════════════════════════════╗
+   🎬 <b>VIDEO YUKLOVCHI BOT</b>
+╚══════════════════════════════╝
+
+Assalomu alaykum, <b>{name}</b>! 👋
+
+📥 Men quyidagi platformalardan video yuklab beraman:
+
+   ▫️ YouTube
+   ▫️ TikTok
+   ▫️ Instagram
+   ▫️ Facebook
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📢 <b>Botdan foydalanish uchun 
+     kanallarimizga obuna bo'ling:</b>
+""",
+
+    "check_subscription": "✅ Tekshirish",
+    
+    "not_subscribed": """
+⚠️ <b>Diqqat!</b>
+
+Siz hali barcha kanallarga obuna bo'lmagansiz!
+
+Iltimos, quyidagi kanallarga obuna bo'ling:
+""",
+
+    "subscribed": """
+╔══════════════════════════════╗
+   ✅ <b>TAYYOR!</b>
+╚══════════════════════════════╝
+
+🎉 Ajoyib! Endi botdan foydalanishingiz mumkin.
+
+📥 <b>Qanday foydalanish:</b>
+▫️ Menga video havolasini yuboring
+▫️ Men uni yuklab sizga jo'nataman
+
+🌐 <b>Qo'llab-quvvatlanadigan saytlar:</b>
+YouTube • TikTok • Instagram • Facebook
+""",
+
     "send_url": "🔗 Video havolasini yuboring:",
-    "downloading": "⏳ Video yuklab olinmoqda... Iltimos, kuting.",
+    
+    "downloading": """
+⏳ <b>Yuklab olinmoqda...</b>
+
+┌─────────────────────────┐
+│ ░░░░░░░░░░░░░░░░░░░░░░ │
+└─────────────────────────┘
+
+Iltimos, kuting...
+""",
+
     "download_complete": "✅ Video tayyor!",
-    "download_error": "❌ Xatolik yuz berdi. Iltimos, havolani tekshirib qaytadan urinib ko'ring.",
-    "invalid_url": "❌ Noto'g'ri havola. Iltimos, YouTube, TikTok, Instagram yoki Facebook havolasini yuboring.",
-    "file_too_large": "⚠️ Video hajmi juda katta (50MB dan ortiq). Siqilgan versiya yuklanmoqda...",
+    
+    "download_error": """
+❌ <b>Xatolik yuz berdi!</b>
+
+Mumkin bo'lgan sabablar:
+▫️ Video maxfiy yoki o'chirilgan
+▫️ Havola noto'g'ri
+▫️ Platforma cheklovi
+
+💡 <b>Maslahat:</b> Boshqa video bilan sinab ko'ring.
+""",
+
+    "invalid_url": """
+⚠️ <b>Noto'g'ri havola!</b>
+
+Iltimos, quyidagi platformalardan havola yuboring:
+▫️ YouTube
+▫️ TikTok  
+▫️ Instagram
+▫️ Facebook
+""",
+
+    "file_too_large": """
+⚠️ <b>Video hajmi katta!</b>
+
+Video 50MB dan ortiq. Siqilgan versiya yuklanmoqda...
+""",
+
     "saved_to_playlist": "✅ Video playlistga saqlandi!",
-    "playlist_empty": "📂 Sizning playlistingiz bo'sh.",
-    "playlist_header": "📂 Sizning playlistingiz:",
-    "help": """🎬 **Video Downloader Bot**
+    
+    "playlist_empty": "📂 Sizning playlistingiz hozircha bo'sh.",
+    
+    "playlist_header": """
+╔══════════════════════════════╗
+   📂 <b>SIZNING PLAYLISTINGIZ</b>
+╚══════════════════════════════╝
+""",
 
-📌 **Qanday foydalanish:**
-1. Kanallarga obuna bo'ling
-2. Video havolasini yuboring
-3. Videoni yuklab oling!
+    "help": """
+╔══════════════════════════════╗
+   ❓ <b>YORDAM</b>
+╚══════════════════════════════╝
 
-🔗 **Qo'llab-quvvatlanadigan platformalar:**
-• YouTube
-• TikTok
-• Instagram
-• Facebook
+📥 <b>Qanday foydalanish:</b>
+1️⃣ Kanallarga obuna bo'ling
+2️⃣ Video havolasini yuboring  
+3️⃣ Videoni yuklab oling!
 
-📂 **Buyruqlar:**
-/start - Botni boshlash
-/playlist - Saqlangan videolar
-/help - Yordam"""
+🌐 <b>Qo'llab-quvvatlanadigan saytlar:</b>
+▫️ YouTube
+▫️ TikTok
+▫️ Instagram
+▫️ Facebook
+
+📂 <b>Buyruqlar:</b>
+▫️ /start - Botni boshlash
+▫️ /playlist - Saqlangan videolar
+▫️ /help - Yordam
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+💬 <b>Muammo bo'lsa:</b>
+Kanallarimizga murojaat qiling!
+""",
+
+    "video_caption": """
+🎬 <b>{title}</b>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📥 @OLTIN_SAQLAYDI_BOT orqali yuklandi
+""",
+
+    "audio_caption": """
+🎵 <b>{title}</b>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📥 @OLTIN_SAQLAYDI_BOT orqali yuklandi
+"""
 }
