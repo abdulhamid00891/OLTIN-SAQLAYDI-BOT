@@ -24,43 +24,41 @@ logger = logging.getLogger(__name__)
 # Foydalanuvchi so'nggi URL'ini saqlash
 user_last_url = {}
 
-async def check_subscription(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """Foydalanuvchi barcha kanallarga obuna bo'lganini tekshirish"""
-    for channel in REQUIRED_CHANNELS:
-        try:
-            member = await context.bot.get_chat_member(chat_id=channel, user_id=user_id)
-            if member.status in ['left', 'kicked']:
-                return False
-        except Exception as e:
-            logger.error(f"Kanal tekshirishda xatolik {channel}: {e}")
-            return False
-    return True
-
 def get_channel_keyboard():
-    """Kanallar tugmalari"""
+    """Kanallar tugmalari - chiroyli dizayn"""
     keyboard = []
     for i, channel in enumerate(REQUIRED_CHANNELS, 1):
         channel_name = channel.replace('@', '')
-        keyboard.append([InlineKeyboardButton(f"📢 {i}-Kanal", url=f"https://t.me/{channel_name}")])
-    keyboard.append([InlineKeyboardButton("✅ Obunani tekshirish", callback_data="check_sub")])
+        keyboard.append([InlineKeyboardButton(
+            f"📢 {i}-Kanal: {channel_name}", 
+            url=f"https://t.me/{channel_name}"
+        )])
+    keyboard.append([InlineKeyboardButton("✅ Tekshirish", callback_data="check_sub")])
     return InlineKeyboardMarkup(keyboard)
 
-def get_video_keyboard(has_url: bool = True):
-    """Video tugmalari"""
+def get_video_keyboard():
+    """Video tugmalari - 3 ta tugma"""
     keyboard = [
         [
             InlineKeyboardButton("📂 Saqlash", callback_data="save_playlist"),
-            InlineKeyboardButton("🔊 Musiqa", callback_data="download_audio"),
+            InlineKeyboardButton("🎵 Musiqa", callback_data="download_audio"),
         ],
-        [InlineKeyboardButton("📤 Tarqatish", switch_inline_query="")]
+        [
+            InlineKeyboardButton("📤 Do'stlarga ulashish", switch_inline_query="")
+        ]
     ]
     return InlineKeyboardMarkup(keyboard)
 
 def get_main_keyboard():
-    """Asosiy tugmalar"""
+    """Asosiy menyu tugmalari"""
     keyboard = [
-        [InlineKeyboardButton("📂 Playlistim", callback_data="show_playlist")],
-        [InlineKeyboardButton("❓ Yordam", callback_data="help")]
+        [
+            InlineKeyboardButton("📂 Playlistim", callback_data="show_playlist"),
+            InlineKeyboardButton("❓ Yordam", callback_data="help")
+        ],
+        [
+            InlineKeyboardButton("📢 Kanal", url="https://t.me/oltiariq_999_magazin_oqboyra")
+        ]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -69,33 +67,39 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     await add_user(user.id, user.username, user.first_name)
     
-    # Har doim kanallarni ko'rsatish (tekshirishsiz)
     welcome_msg = MESSAGES["welcome"].format(name=user.first_name or "do'stim")
     await update.message.reply_text(
         welcome_msg,
-        reply_markup=get_channel_keyboard()
+        reply_markup=get_channel_keyboard(),
+        parse_mode="HTML"
     )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Yordam buyrug'i"""
     await update.message.reply_text(
         MESSAGES["help"],
-        parse_mode="Markdown"
+        parse_mode="HTML",
+        reply_markup=get_main_keyboard()
     )
 
 async def playlist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Playlist ko'rish"""
     user_id = update.effective_user.id
-    
     playlist = await get_playlist(user_id)
     
     if not playlist:
-        await update.message.reply_text(MESSAGES["playlist_empty"])
+        await update.message.reply_text(
+            MESSAGES["playlist_empty"],
+            parse_mode="HTML"
+        )
         return
     
-    await update.message.reply_text(MESSAGES["playlist_header"])
+    await update.message.reply_text(
+        MESSAGES["playlist_header"],
+        parse_mode="HTML"
+    )
     
-    for item in playlist[:10]:  # Oxirgi 10 ta
+    for item in playlist[:10]:
         try:
             if item['file_type'] == 'video':
                 await context.bot.send_video(
@@ -120,38 +124,54 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # URL ajratib olish
     url = extract_url(text)
     if not url or not is_valid_url(url):
-        await update.message.reply_text(MESSAGES["invalid_url"])
+        await update.message.reply_text(
+            MESSAGES["invalid_url"],
+            parse_mode="HTML"
+        )
         return
     
     # URL'ni saqlash
     user_last_url[user.id] = url
     
     # Yuklab olish xabari
-    status_msg = await update.message.reply_text(MESSAGES["downloading"])
+    status_msg = await update.message.reply_text(
+        MESSAGES["downloading"],
+        parse_mode="HTML"
+    )
     
     try:
         # Video yuklab olish
         result = await download_video(url, user.id)
         
         if not result['success']:
-            await status_msg.edit_text(MESSAGES["download_error"])
+            await status_msg.edit_text(
+                MESSAGES["download_error"],
+                parse_mode="HTML"
+            )
             return
         
         file_path = result['file_path']
         
         # Fayl hajmini tekshirish
         if result.get('is_large'):
-            await status_msg.edit_text(MESSAGES["file_too_large"])
+            await status_msg.edit_text(
+                MESSAGES["file_too_large"],
+                parse_mode="HTML"
+            )
+        
+        # Video caption
+        caption = MESSAGES["video_caption"].format(title=result['title'][:50])
         
         # Video yuborish
         with open(file_path, 'rb') as video_file:
             sent_message = await update.message.reply_video(
                 video=video_file,
-                caption=f"🎬 {result['title']}",
+                caption=caption,
+                parse_mode="HTML",
                 reply_markup=get_video_keyboard()
             )
         
-        # File ID saqlash (keyinroq playlist uchun)
+        # File ID saqlash
         context.user_data['last_video'] = {
             'file_id': sent_message.video.file_id,
             'title': result['title'],
@@ -159,13 +179,14 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         
         await status_msg.delete()
-        
-        # Faylni o'chirish
         cleanup_file(file_path)
         
     except Exception as e:
         logger.error(f"Video yuborishda xatolik: {e}")
-        await status_msg.edit_text(MESSAGES["download_error"])
+        await status_msg.edit_text(
+            MESSAGES["download_error"],
+            parse_mode="HTML"
+        )
 
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Callback tugmalar"""
@@ -179,11 +200,11 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Tekshirmasdan o'tkazish
         await query.edit_message_text(
             MESSAGES["subscribed"],
+            parse_mode="HTML",
             reply_markup=get_main_keyboard()
         )
     
     elif data == "save_playlist":
-        # Playlistga saqlash
         last_video = context.user_data.get('last_video')
         if last_video:
             await add_to_playlist(
@@ -193,31 +214,35 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 title=last_video['title'],
                 url=last_video['url']
             )
-            await query.answer(MESSAGES["saved_to_playlist"], show_alert=True)
+            await query.answer("✅ Video playlistga saqlandi!", show_alert=True)
         else:
             await query.answer("❌ Video topilmadi", show_alert=True)
     
     elif data == "download_audio":
-        # Audio yuklab olish
         url = user_last_url.get(user.id)
         if not url:
             await query.answer("❌ URL topilmadi", show_alert=True)
             return
         
         await query.answer("🎵 Musiqa yuklanmoqda...")
-        status_msg = await query.message.reply_text("⏳ Musiqa yuklab olinmoqda...")
+        status_msg = await query.message.reply_text(
+            "⏳ <b>Musiqa yuklab olinmoqda...</b>",
+            parse_mode="HTML"
+        )
         
         try:
             result = await download_audio(url, user.id)
             
             if result['success']:
+                caption = MESSAGES["audio_caption"].format(title=result['title'][:50])
+                
                 with open(result['file_path'], 'rb') as audio_file:
                     sent_audio = await query.message.reply_audio(
                         audio=audio_file,
-                        caption=f"🎵 {result['title']}"
+                        caption=caption,
+                        parse_mode="HTML"
                     )
                 
-                # Audio file_id saqlash
                 context.user_data['last_audio'] = {
                     'file_id': sent_audio.audio.file_id,
                     'title': result['title'],
@@ -227,20 +252,28 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await status_msg.delete()
                 cleanup_file(result['file_path'])
             else:
-                await status_msg.edit_text(MESSAGES["download_error"])
+                await status_msg.edit_text(
+                    MESSAGES["download_error"],
+                    parse_mode="HTML"
+                )
         except Exception as e:
             logger.error(f"Audio xatolik: {e}")
-            await status_msg.edit_text(MESSAGES["download_error"])
+            await status_msg.edit_text(
+                MESSAGES["download_error"],
+                parse_mode="HTML"
+            )
     
     elif data == "show_playlist":
-        # Playlist ko'rsatish
         playlist = await get_playlist(user.id)
         
         if not playlist:
             await query.answer(MESSAGES["playlist_empty"], show_alert=True)
             return
         
-        await query.message.reply_text(MESSAGES["playlist_header"])
+        await query.message.reply_text(
+            MESSAGES["playlist_header"],
+            parse_mode="HTML"
+        )
         
         for item in playlist[:10]:
             try:
@@ -260,7 +293,11 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.error(f"Playlist item xatolik: {e}")
     
     elif data == "help":
-        await query.message.reply_text(MESSAGES["help"], parse_mode="Markdown")
+        await query.message.reply_text(
+            MESSAGES["help"],
+            parse_mode="HTML",
+            reply_markup=get_main_keyboard()
+        )
 
 async def post_init(application):
     """Bot ishga tushganda"""
@@ -269,17 +306,14 @@ async def post_init(application):
 
 def main():
     """Asosiy funksiya"""
-    # Application yaratish
     application = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
     
-    # Handlers qo'shish
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("playlist", playlist_command))
     application.add_handler(CallbackQueryHandler(callback_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_url))
     
-    # Botni ishga tushirish
     logger.info("Bot ishga tushmoqda...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
