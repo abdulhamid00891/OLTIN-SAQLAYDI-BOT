@@ -69,20 +69,12 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     await add_user(user.id, user.username, user.first_name)
     
-    # Obunani tekshirish
-    is_subscribed = await check_subscription(user.id, context)
-    
-    if is_subscribed:
-        await update.message.reply_text(
-            MESSAGES["subscribed"],
-            reply_markup=get_main_keyboard()
-        )
-    else:
-        welcome_msg = MESSAGES["welcome"].format(name=user.first_name or "do'stim")
-        await update.message.reply_text(
-            welcome_msg,
-            reply_markup=get_channel_keyboard()
-        )
+    # Har doim kanallarni ko'rsatish (tekshirishsiz)
+    welcome_msg = MESSAGES["welcome"].format(name=user.first_name or "do'stim")
+    await update.message.reply_text(
+        welcome_msg,
+        reply_markup=get_channel_keyboard()
+    )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Yordam buyrug'i"""
@@ -94,15 +86,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def playlist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Playlist ko'rish"""
     user_id = update.effective_user.id
-    
-    # Avval obunani tekshirish
-    is_subscribed = await check_subscription(user_id, context)
-    if not is_subscribed:
-        await update.message.reply_text(
-            MESSAGES["not_subscribed"],
-            reply_markup=get_channel_keyboard()
-        )
-        return
     
     playlist = await get_playlist(user_id)
     
@@ -133,15 +116,6 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """URL qayta ishlash"""
     user = update.effective_user
     text = update.message.text
-    
-    # Obunani tekshirish
-    is_subscribed = await check_subscription(user.id, context)
-    if not is_subscribed:
-        await update.message.reply_text(
-            MESSAGES["not_subscribed"],
-            reply_markup=get_channel_keyboard()
-        )
-        return
     
     # URL ajratib olish
     url = extract_url(text)
@@ -202,16 +176,11 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     
     if data == "check_sub":
-        # Obunani tekshirish
-        is_subscribed = await check_subscription(user.id, context)
-        
-        if is_subscribed:
-            await query.edit_message_text(
-                MESSAGES["subscribed"],
-                reply_markup=get_main_keyboard()
-            )
-        else:
-            await query.answer("❌ Siz hali barcha kanallarga obuna bo'lmagansiz!", show_alert=True)
+        # Tekshirmasdan o'tkazish
+        await query.edit_message_text(
+            MESSAGES["subscribed"],
+            reply_markup=get_main_keyboard()
+        )
     
     elif data == "save_playlist":
         # Playlistga saqlash
